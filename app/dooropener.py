@@ -5,7 +5,7 @@ This file implements the dooropener service.
 
 The dooropener service is intended to run on a Raspberry Pi Zero W and extend
 a Doorbird video door unit with a wireless door opener and bell, using Shelly
- switches as actors.
+switches as actors.
 
 The dooropener has two relais inputs, for the two Doorbird relais outputs, an
 output as bell trigger and a set of status LEDs. When a relais input is
@@ -24,7 +24,9 @@ and if an online connection is available.
 import requests
 import time
 import logging
-from flask import Flask
+import json
+import urllib.parse
+from flask import Flask, request, send_from_directory
 from threading import Thread
 from gpiozero import Button, LED
 from waitress import serve
@@ -276,6 +278,16 @@ class Dooropener:
         self.relais2 = Relais(21, 19, "Relais 2", on_time=60)
         self.bell = Bell()
 
+        self._load_settings()
+
+    def _load_settings(self):
+        """ load settings from config file """
+        pass
+
+    def _save_settings(self):
+        """ save settings to config file """
+        pass
+
     def start(self):
         """ enable all components """
         self.life_check.enable()
@@ -293,15 +305,101 @@ class Dooropener:
         self.relais1.disable()
         self.relais2.disable()
 
+    def config(self):
+        return {
+            'r1_on_url': self.relais1.on_url,
+            'r1_off_url': self.relais1.off_url,
+            'r1_time': self.relais1.on_time,
+            'r2_on_url': self.relais2.on_url,
+            'r2_off_url': self.relais2.off_url,
+            'r2_time': self.relais2.on_time,
+            'online_url': self.life_check.online_url,
+            'online_time': self.life_check.online_time,
+            'bell_time': self.bell.honk_time,
+        }
+
+    def update(self, key, value):
+        try:
+            success = False
+            if key == 'r1_on_url':
+                self.relais1.on_url = value
+                success = True
+            elif key == 'r1_off_url':
+                self.relais1.off_url = value
+                success = True
+            elif key == 'r1_time':
+                self.relais1.on_time = float(value)
+                success = True
+            elif key == 'r2_on_url':
+                self.relais2.on_url = value
+                success = True
+            elif key == 'r2_off_url':
+                self.relais2.off_url = value
+                success = True
+            elif key == 'r2_time':
+                self.relais1.on_time = float(value)
+                success = True
+            elif key == 'online_url':
+                self.life_check.online_url = value
+                success = True
+            elif key == 'online_time':
+                self.life_check.online_time = float(value)
+                success = True
+            elif key == 'bell_time':
+                self.bell.honk_time = float(value)
+                success = True
+            else:
+                success = False
+
+            if success:
+                self._save_settings()
+
+            return success
+        except Exception as e:
+            logging.error('Config update failed!', e)
+            return False
+
+
 # ---- Start of WEB API ----
 
 
-def create_api():
+def create_api(dooropener):
     app = Flask(__name__)
 
-    @app.route('/api/status')
+    @app.route('/api/status', methods=['GET'])
     def status():
-        return 'Server Works!'
+        return json.dumps(dooropener.config())
+
+    @app.route('/api/status/<key>', methods=['GET'])
+    def get_value(key):
+        values = dooropener.config()
+        if key in values:
+            if values[key] is None:
+                return ''
+            return f'{values[key]}'
+        else:
+            return 'not found', 404
+
+    @app.route('/api/status/<key>', methods=['POST'])
+    def update_value(key):
+        if dooropener.update(key, request.data):
+            return request.data
+        else:
+            return 'not found', 404
+
+    @app.route('/api/status/<key>/<value>', methods=['GET'])
+    def get_update_value(key, value):
+        value = urllib.parse.unquote(value)
+        if dooropener.update(key, value):
+            return value
+        else:
+            return 'not found', 404
+
+    @app.route('/', defaults=dict(filename=None))
+    @app.route('/<path:filename>', methods=['GET'])
+    def index(filename):
+        filename = filename or 'index.html'
+        return send_from_directory('./static', filename)
 
     return app
 
@@ -311,7 +409,7 @@ def create_api():
 def check_gpio():
     """ check if GPIO are available on the machine and use mocks if not """
     try:
-        import RPi.GPIO as gpio
+        import RPi.GPIO
         logging.info("GPIO detected")
     except (ImportError, RuntimeError):
         from gpiozero import Device
@@ -329,7 +427,7 @@ def main_loop():
     app.honk()
 
     # create Flask app and run web api
-    api = create_api()
+    api = create_api(app)
     serve(api, host='0.0.0.0', port=80)  # this will block until "Ctrl + C"
 
     app.stop()

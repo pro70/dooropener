@@ -1,0 +1,11 @@
+{
+    "python.linting.pycodestyleEnabled": true,
+    "python.linting.enabled": true,
+    "cSpell.words": [
+        "gpio",
+        "gpiozero",
+        "leds",
+        "pi",
+        "r"
+    ]
+}
