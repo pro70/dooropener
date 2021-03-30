@@ -559,7 +559,7 @@ def main_loop():
 
     # create Flask app and run web api
     api = create_api(app)
-    serve(api, host='0.0.0.0', port=80)  # this will block until "Ctrl + C"
+    serve(api, host='0.0.0.0', port=9000)  # this will block until "Ctrl + C"
 
     app.stop()
 
