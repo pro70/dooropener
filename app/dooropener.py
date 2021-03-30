@@ -26,6 +26,7 @@ import time
 import logging
 import json
 import urllib.parse
+import os.path
 from flask import Flask, request, send_from_directory
 from threading import Thread
 from gpiozero import Button, LED
@@ -121,6 +122,72 @@ class Relais:
         self.thread.start()  # listen using a thread to not block
 
 
+class VirtualRelais:
+    """
+    This class implements a virtual relais.
+
+    A virtual relais listen to a web action and triggers a http action
+    call when the action URL is triggered. After a cool down time
+    another http action call is triggered.
+
+    Parameters:
+    -----------
+    name: string
+        relais name for logging
+    on_time: int, default 5
+        hot time after input is triggered
+    on_url: string, default is None
+        http URL which is triggered on signal
+    off_url: string, default is None
+        http URL which is triggered after cool down time
+    """
+
+    def __init__(self, name, on_time=5, on_url=None, off_url=None):
+        """
+        Init the VirtualRelais object.
+        """
+        self.on_time = on_time
+        self.on_url = on_url
+        self.off_url = off_url
+        self.name = name
+        self.hot = False
+
+    def _action(self):
+        """ Handle action event. """
+        logging.info(f"{self.name} - triggered")
+        self.hot = True
+        if self.on_url:
+            self._call(self.on_url)  # If on URL, trigger URL
+        else:
+            logging.warning(f"{self.name} - no on url")
+
+        time.sleep(self.on_time)  # wait for cool down time
+
+        self.hot = False
+        if self.off_url:
+            self._call(self.off_url)  # If on URL, trigger URL
+        else:
+            logging.warning(f"{self.name} - no off url")
+
+        logging.info(f"{self.name} - cooled down")
+
+    def _call(self, url):
+        """ Call the action URL """
+        r = requests.get(url)
+        if r.status_code == 200:  # status code OK
+            logging.info(f"{self.name} - call successful: {url}")
+        else:
+            logging.error(f"{self.name} - call failed: {url}")
+
+    def trigger(self):
+        """ Process an action event. """
+        if self.hot:
+            logging.info(f"{self.name} - already hot, ingore event")
+            return
+        self.thread = Thread(target=self._action)
+        self.thread.start()  # listen using a thread to not block
+
+
 class Bell:
     """
     This class implements a bell and its behavior.
@@ -156,9 +223,11 @@ class Bell:
         if not honk_time:
             honk_time = self.honk_time
 
+        logging.info(f'ringing the bell for {honk_time}s')
         self._on()
-        time.sleep(self.honk_time)
+        time.sleep(honk_time)
         self._off()
+        logging.info(f'bell ringed for {honk_time}s')
 
     def _on(self):
         """ turn on bell and signal LED """
@@ -269,6 +338,8 @@ class Dooropener:
         a Relais instance using pins 21 and 19
     bell: Bell
         a Bell instance
+    bellAction: VirtualRelais
+        a VirtualRelais to trigger a bell WLAN relais
     """
 
     def __init__(self):
@@ -277,16 +348,32 @@ class Dooropener:
         self.relais1 = Relais(20, 13, "Relais 1", on_time=3)
         self.relais2 = Relais(21, 19, "Relais 2", on_time=60)
         self.bell = Bell()
+        self.bellAction = VirtualRelais("Bell Action", on_time=1)
+        self.config_file = 'config.json'
 
         self._load_settings()
 
     def _load_settings(self):
         """ load settings from config file """
-        pass
+        if os.path.isfile(self.config_file):
+            try:
+                with open(self.config_file) as f:
+                    data = json.loads(f.read())
+                    for key, value in data.items():
+                        self.update(key, value)
+                        logging.info(f'Config: {key}={value}')
+            except Exception as e:
+                logging.error('Config load error!', e)
+        else:
+            logging.warning(f'Config file {self.config_file} not found.')
 
     def _save_settings(self):
         """ save settings to config file """
-        pass
+        try:
+            with open(self.config_file, 'w') as f:
+                f.write(json.dumps(self.config()))
+        except Exception as e:
+            logging.error('Config save error!', e)
 
     def start(self):
         """ enable all components """
@@ -294,9 +381,13 @@ class Dooropener:
         self.relais1.enable()
         self.relais2.enable()
 
-    def honk(self):
+    def honk(self, honk_time=None):
         """ ring the bell """
-        self.bell.honk()
+        self.bell.honk(honk_time)
+
+    def trigger_bell(self):
+        """ trigger the bell action """
+        self.bellAction.trigger()
 
     def stop(self):
         """ disable all components """
@@ -316,6 +407,9 @@ class Dooropener:
             'online_url': self.life_check.online_url,
             'online_time': self.life_check.online_time,
             'bell_time': self.bell.honk_time,
+            'ba_on_url': self.bellAction.on_url,
+            'ba_off_url': self.bellAction.off_url,
+            'ba_time': self.bellAction.on_time,
         }
 
     def update(self, key, value):
@@ -347,6 +441,15 @@ class Dooropener:
                 success = True
             elif key == 'bell_time':
                 self.bell.honk_time = float(value)
+                success = True
+            elif key == 'ba_on_url':
+                self.bellAction.on_url = value
+                success = True
+            elif key == 'ba_off_url':
+                self.bellAction.off_url = value
+                success = True
+            elif key == 'ba_time':
+                self.bellAction.on_time = float(value)
                 success = True
             else:
                 success = False
@@ -395,11 +498,29 @@ def create_api(dooropener):
         else:
             return 'not found', 404
 
-    @app.route('/', defaults=dict(filename=None))
+    @app.route('/', defaults=dict(filename=None), methods=['GET'])
     @app.route('/<path:filename>', methods=['GET'])
     def index(filename):
         filename = filename or 'index.html'
         return send_from_directory('./static', filename)
+
+    @app.route('/api/action/honk', defaults=dict(time=None), methods=['GET'])
+    @app.route('/api/action/honk/<time>', methods=['GET'])
+    def honk_action(time):
+        if time:
+            try:
+                dooropener.honk(float(time))
+                return f'beep {time}', 200
+            except Exception as e:
+                logging.error('honk action', e)
+                return 'not found', 404
+        dooropener.honk()
+        return 'beep', 200
+
+    @app.route('/api/action/bell', methods=['GET'])
+    def bell_action():
+        dooropener.trigger_bell()
+        return 'ring', 200
 
     return app
 
