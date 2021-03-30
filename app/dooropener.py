@@ -414,6 +414,12 @@ class Dooropener:
 
     def update(self, key, value):
         try:
+            key = str(key)
+            if value is not None:
+                value = str(value)
+
+            logging.info(f'update config value: {key}={value}')
+
             success = False
             if key == 'r1_on_url':
                 self.relais1.on_url = value
@@ -485,9 +491,13 @@ def create_api(dooropener):
 
     @app.route('/api/status/<key>', methods=['POST'])
     def update_value(key):
-        if dooropener.update(key, request.data):
-            return request.data
-        else:
+        try:
+            if dooropener.update(key, str(request.data, 'utf-8')):
+                return request.data
+            else:
+                return 'not found', 404
+        except Exception as e:
+            logging.error('update POST error', e)
             return 'not found', 404
 
     @app.route('/api/status/<key>/<value>', methods=['GET'])
