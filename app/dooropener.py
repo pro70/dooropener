@@ -548,9 +548,7 @@ def mock_gpio():
 def check_gpio():
     """ check if GPIO are available on the machine and use mocks if not """
     try:
-        import system
-        if socket.gethostname() != 'dooropenerpi':
-            mock_gpio()
+        LED(16)
     except (ImportError, RuntimeError):
         mock_gpio()
 
