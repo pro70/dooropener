@@ -537,16 +537,22 @@ def create_api(dooropener):
 # ---- End of WEB API ----
 
 
+def mock_gpio():
+    """ mock GPIO pins """
+    from gpiozero import Device
+    from gpiozero.pins.mock import MockFactory
+    Device.pin_factory = MockFactory()
+    logging.error("No GPIO detected! Mocking GPIO...")
+
+
 def check_gpio():
     """ check if GPIO are available on the machine and use mocks if not """
     try:
-        import RPi.GPIO
-        logging.info("GPIO detected")
+        import system
+        if socket.gethostname() != 'dooropenerpi':
+            mock_gpio()
     except (ImportError, RuntimeError):
-        from gpiozero import Device
-        from gpiozero.pins.mock import MockFactory
-        Device.pin_factory = MockFactory()
-        logging.error("No GPIO detected! Mocking GPIO...")
+        mock_gpio()
 
 
 def main_loop():
