@@ -12,18 +12,18 @@ Follow these steps to install the app and setup the service.
 git clone ...
 ```
 
-* Check your paths in <repo>/app/doorbird.service
+* Check your paths in <repo>/app/dooropener.service
 * Install the service file
 
 ```
-sudo cp <repo>/app/doorbird.service /etc/systemd/system
+sudo cp <repo>/app/dooropener.service /etc/systemd/system
 ```
 
 * Test the service
 
 ```
-sudo systemctl start doorbird
-sudo systemctl status doorbird
+sudo systemctl start dooropener
+sudo systemctl status dooropener
 ```
 
 and the web interface: http//<ip>:9000
@@ -31,7 +31,7 @@ and the web interface: http//<ip>:9000
 * Enable the service
 
 ```
-sudo systemctl enable doorbird
+sudo systemctl enable dooropener
 ```
 
 
