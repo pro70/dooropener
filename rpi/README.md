@@ -80,3 +80,12 @@ I will run the service as user "pi" and therefore have to give pi the necessary 
 ```
 sudo usermod -a -G gpio pi
 ```
+
+### Disalbe WiFi power management
+
+I had the issue that my Pi looses WiFi connection after a few hours. This seemed to be related to the WiFi power
+management. To disable the WiFi powermanagement I added the following line to `/etc/rc.local`:
+
+```
+iwconfig wlan0 power off
+```
