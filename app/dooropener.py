@@ -319,14 +319,16 @@ class LifeCheck:
                 logging.info("WLAN OK")
                 self.wlan_ok.on()
             else:
-                logging.error("WLAN failed!")
                 self.offline_counter = self.offline_counter + 1
+                logging.error("WLAN failed!")
+                logging.error(f"Offline counter: {self.offline_counter}")
                 self.wlan_ok.off()
         except Exception as e:
             logging.error("Life check - online request error!", e)
             self.wlan_ok.off()
 
-        if self.offline_counter > 5:
+        if self.offline_counter >= 2:
+            logging.error("Triggering system reboot!")
             os.system('sudo reboot')
 
     def enable(self):
