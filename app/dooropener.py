@@ -111,11 +111,14 @@ class Relais:
 
     def _call(self, url):
         """ Call the action URL """
-        r = requests.get(url)
-        if r.status_code == 200:  # status code OK
-            logging.info(f"{self.name} - call successful: {url}")
-        else:
-            logging.error(f"{self.name} - call failed: {url}")
+        try:
+            r = requests.get(url)
+            if r.status_code == 200:  # status code OK
+                logging.info(f"{self.name} - call successful: {url}")
+            else:
+                logging.error(f"{self.name} - call failed: {url}")
+        except Exception as e:
+            logging.error(f"{self.name} - request error!", e)
 
     def enable(self):
         """ Start listening for input. """
@@ -174,11 +177,14 @@ class VirtualRelais:
 
     def _call(self, url):
         """ Call the action URL """
-        r = requests.get(url)
-        if r.status_code == 200:  # status code OK
-            logging.info(f"{self.name} - call successful: {url}")
-        else:
-            logging.error(f"{self.name} - call failed: {url}")
+        try:
+            r = requests.get(url)
+            if r.status_code == 200:  # status code OK
+                logging.info(f"{self.name} - call successful: {url}")
+            else:
+                logging.error(f"{self.name} - call failed: {url}")
+        except Exception as e:
+            logging.error(f"{self.name} - request error!", e)
 
     def trigger(self):
         """ Process an action event. """
@@ -307,13 +313,17 @@ class LifeCheck:
     def _online_check(self):
         """ execute the online check and update online status """
         logging.info("WLAN check ...")
-        r = requests.get(self.online_url)
-        if r.status_code == 200:
-            logging.info("WLAN OK")
-            self.wlan_ok.on()
-        else:
-            logging.error("WLAN failed!")
-            self.offline_counter = self.offline_counter + 1
+        try:
+            r = requests.get(self.online_url)
+            if r.status_code == 200:
+                logging.info("WLAN OK")
+                self.wlan_ok.on()
+            else:
+                logging.error("WLAN failed!")
+                self.offline_counter = self.offline_counter + 1
+                self.wlan_ok.off()
+        except Exception as e:
+            logging.error("Life check - online request error!", e)
             self.wlan_ok.off()
 
         if self.offline_counter > 5:
