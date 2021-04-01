@@ -443,7 +443,7 @@ class Dooropener:
                 self.relais2.off_url = value
                 success = True
             elif key == 'r2_time':
-                self.relais1.on_time = float(value)
+                self.relais2.on_time = float(value)
                 success = True
             elif key == 'online_url':
                 self.life_check.online_url = value
