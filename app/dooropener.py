@@ -27,6 +27,7 @@ import logging
 import json
 import urllib.parse
 import os.path
+import os
 from flask import Flask, request, send_from_directory
 from threading import Thread
 from gpiozero import Button, LED
@@ -281,6 +282,7 @@ class LifeCheck:
         self.running = LED(run_pin)
         self.wlan_ok = LED(wlan_pin)
         self.run = True
+        self.offline_counter = 0
 
     def _life_check(self):
         """ Thread function for life check. """
@@ -311,7 +313,11 @@ class LifeCheck:
             self.wlan_ok.on()
         else:
             logging.error("WLAN failed!")
+            self.offline_counter = self.offline_counter + 1
             self.wlan_ok.off()
+
+        if self.offline_counter > 5:
+            os.system('sudo reboot')
 
     def enable(self):
         """ Start life check. """
