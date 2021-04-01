@@ -34,4 +34,10 @@ and the web interface: http//<ip>:9000
 sudo systemctl enable dooropener
 ```
 
+## Issues and mitigations
 
+### Lost WiFi connection
+
+I had the issue that my Pi lost the WiFi connection over night. As mitigatiom measure I added a
+offline counter to the dooropener service and trigger a system reboot when the app detects a
+WiFi failure for more than 5 minutes.
