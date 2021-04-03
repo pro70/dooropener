@@ -89,3 +89,9 @@ management. To disable the WiFi powermanagement I added the following line to `/
 ```
 iwconfig wlan0 power off
 ```
+
+### Auto reconnect to WiFi
+
+Copy `ifupdown.sh`from `/etc/wpa_supplicant/` to `/etc/ifplugd/action.d/`.
+
+For details see https://www.davidkehr.com/raspberry-pi-automatischer-wlan-reconnect/
